@@ -1,4 +1,4 @@
-# PHP Web Application README
+# PHP Web Application
 
 This README provides an overview of the PHP web application code snippets provided, covering database connections, user authentication, CRUD operations, file handling, email functionality, payment integrations, chained select functionality, security measures, and more.
 
