@@ -1,6 +1,6 @@
 # PHP Web Application README
 
-This README provides an overview of the PHP web application code snippets provided, covering database connections, user authentication, CRUD operations, file handling, email functionality, security measures, and more.
+This README provides an overview of the PHP web application code snippets provided, covering database connections, user authentication, CRUD operations, file handling, email functionality, payment integrations, chained select functionality, security measures, and more.
 
 ## Table of Contents
 1. [Project Setup](#project-setup)
@@ -9,15 +9,17 @@ This README provides an overview of the PHP web application code snippets provid
 4. [CRUD Operations](#crud-operations)
 5. [File Handling](#file-handling)
 6. [Email Sending](#email-sending)
-7. [Security Measures](#security-measures)
-8. [Pagination](#pagination)
-9. [URL Rewriting](#url-rewriting)
-10. [Date and Time Utilities](#date-and-time-utilities)
-11. [JSON Handling](#json-handling)
-12. [Video Duration Conversion](#video-duration-conversion)
-13. [Automatic Logout](#automatic-logout)
-14. [Export to CSV](#export-to-csv)
-15. [Error Handling](#error-handling)
+7. [Payment Integrations](#payment-integrations)
+8. [Chained Select](#chained-select)
+9. [Security Measures](#security-measures)
+10. [Pagination](#pagination)
+11. [URL Rewriting](#url-rewriting)
+12. [Date and Time Utilities](#date-and-time-utilities)
+13. [JSON Handling](#json-handling)
+14. [Video Duration Conversion](#video-duration-conversion)
+15. [Automatic Logout](#automatic-logout)
+16. [Export to CSV](#export-to-csv)
+17. [Error Handling](#error-handling)
 
 ## Project Setup
 - **Base URL Configuration**: Define `BASE_URL` and `ADMIN_URL` for consistent URL management:
@@ -25,11 +27,17 @@ This README provides an overview of the PHP web application code snippets provid
   define("BASE_URL", "http://localhost/project/");
   define("ADMIN_URL", BASE_URL."admin/");
   ```
-- **Dependencies**: Install PHPMailer for email functionality using Composer:
+- **Dependencies**: Install PHPMailer, Omnipay (PayPal), and Stripe PHP SDK using Composer:
   ```bash
   composer require phpmailer/phpmailer
+  composer require league/omnipay omnipay/paypal
+  composer require stripe/stripe-php
   ```
 - **Directory Structure**: Ensure an `uploads/` directory for file uploads and `vendor/` for Composer dependencies.
+- **External Libraries**: Include jQuery for AJAX functionality (used in chained select):
+  ```html
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  ```
 
 ## Database Connection
 Connect to a MySQL database using PDO with error handling:
@@ -102,6 +110,105 @@ try {
     echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
 }
 ```
+
+## Payment Integrations
+### PayPal Integration
+- **PayPal Information**:
+  - Developer Account: `developer@cwa.com`
+  - Personal Account: `sb-vhfyz28322584@personal.example.com`
+  - Business Account: `sb-6l43bc27296072@business.example.com`
+  - Client ID: `AUepW_R8YYWL7R9nASWIkYSvoLg_3KzYFeb-tt0KMWuWOBwX_JmYlMGKMWbsg_bhPIB2CoNNy5AGk1dm`
+  - Secret: `EFuwGqxMAPpSMCoxkmo6-WWnt02EjZFNtdN39Z9Ay-rmruF2gR2MmCPdQn1Rk1fH5z93yd96fB5hqP6s`
+- **GitHub**: [Omnipay PayPal](https://github.com/thephpleague/omnipay-paypal)
+- **Install**: 
+  ```bash
+  composer require league/omnipay omnipay/paypal
+  ```
+- **Configuration** (`config.php`):
+  ```php
+  require_once "vendor/autoload.php";
+  use Omnipay\Omnipay;
+  define('CLIENT_ID', 'your_client_id');
+  define('CLIENT_SECRET', 'your_client_secret');
+  define('PAYPAL_RETURN_URL', 'http://localhost/payment/success.php');
+  define('PAYPAL_CANCEL_URL', 'http://localhost/payment/cancel.php');
+  define('PAYPAL_CURRENCY', 'USD');
+  $gateway = Omnipay::create('PayPal_Rest');
+  $gateway->setClientId(CLIENT_ID);
+  $gateway->setSecret(CLIENT_SECRET);
+  $gateway->setTestMode(true);
+  ```
+- **Form Submit** (`index.php`): Initiates payment and redirects to PayPal.
+- **Success Page** (`success.php`): Processes successful transactions and stores details.
+- **Cancel Page** (`cancel.php`): Handles canceled payments.
+
+### Stripe Integration
+- **GitHub**: [Stripe PHP](https://github.com/stripe/stripe-php)
+- **Install**:
+  ```bash
+  composer require stripe/stripe-php
+  ```
+- **Configuration**:
+  ```php
+  define('STRIPE_TEST_PK', 'publishable_key');
+  define('STRIPE_TEST_SK', 'secret_key');
+  define('STRIPE_SUCCESS_URL', 'http://localhost/payment/success.php');
+  define('STRIPE_CANCEL_URL', 'http://localhost/payment/cancel.php');
+  ```
+- **Form Submit** (`index.php`): Creates a Stripe Checkout session and redirects.
+- **Success Page** (`success.php`): Verifies payment and displays confirmation.
+- **Cancel Page** (`cancel.php`): Handles canceled payments.
+
+## Chained Select
+Implements dynamic dropdowns using AJAX to populate schedules based on selected days:
+- **Frontend** (`ajax.php`):
+  ```php
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <select id="schedule_day" name="schedule_day_id">
+      <option value="">-- Select a Day --</option>
+      <!-- Populated from schedule_days table -->
+  </select>
+  <select id="schedule" name="schedule_id">
+      <option value="">-- Select a Schedule --</option>
+  </select>
+  <script>
+      $(document).ready(function() {
+          $('#schedule_day').on('change', function() {
+              var scheduleDayId = $(this).val();
+              $('#schedule').html('<option value="">-- Select a Schedule --</option>');
+              if (scheduleDayId) {
+                  $.ajax({
+                      url: 'ajax1.php',
+                      type: 'POST',
+                      data: { schedule_day_id: scheduleDayId },
+                      dataType: 'json',
+                      success: function(response) {
+                          if (response.length > 0) {
+                              $.each(response, function(index, schedule) {
+                                  $('#schedule').append(
+                                      `<option value='${schedule.id}'>${schedule.name} - ${schedule.time}</option>`
+                                  );
+                              });
+                          } else {
+                              $('#schedule').append('<option value="">No schedules found</option>');
+                          }
+                      }
+                  });
+              }
+          });
+      });
+  </script>
+  ```
+- **Backend** (`ajax1.php`):
+  ```php
+  $scheduleDayId = $_POST['schedule_day_id'];
+  $statement = $pdo->prepare("SELECT * FROM schedules WHERE schedule_day_id=? ORDER BY item_order");
+  $statement->execute([$scheduleDayId]);
+  $schedules = $statement->fetchAll(PDO::FETCH_ASSOC);
+  header('Content-Type: application/json');
+  echo json_encode($schedules);
+  ```
+- **Database**: Requires `schedule_days` (columns: `id`, `day`, `order1`) and `schedules` (columns: `id`, `schedule_day_id`, `name`, `time`, `item_order`) tables.
 
 ## Security Measures
 - **SQL Injection**: Use prepared statements and type casting for GET parameters.
@@ -198,11 +305,15 @@ header('Content-Disposition: attachment; filename=subscribers_'.date('Y-m-d H:i:
 ## Usage
 1. Configure the database credentials in the connection script.
 2. Set up SMTP credentials for email functionality.
-3. Place `.htaccess` in the root directory for URL rewriting.
-4. Ensure the `uploads/` directory is writable for file uploads.
-5. Test all functionalities (login, registration, CRUD, etc.) in a local or production environment.
+3. Configure PayPal and Stripe credentials in `config.php`.
+4. Place `.htaccess` in the root directory for URL rewriting.
+5. Ensure the `uploads/` directory is writable for file uploads.
+6. Set up `schedule_days` and `schedules` tables for chained select functionality.
+7. Test all functionalities (login, registration, CRUD, payments, chained select, etc.) in a local or production environment.
 
 ## Notes
-- Replace placeholder values (e.g., `SMTP_HOST`, `db_name`) with actual values.
+- Replace placeholder values (e.g., `SMTP_HOST`, `db_name`, `your_client_id`, `publishable_key`) with actual values.
 - Ensure proper file permissions for uploads and session handling.
-- Test email functionality with a valid SMTP service (e.g., Mailtrap for testing).
+- Test email and payment functionalities with valid services (e.g., Mailtrap for email, PayPal Sandbox, Stripe Test Mode).
+- Switch PayPal `setTestMode` to `false` for production.
+- Ensure jQuery is accessible for chained select functionality.
